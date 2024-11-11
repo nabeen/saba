@@ -1,0 +1,10 @@
+[package]
+name = "saba"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["noli"]
+
+[dependencies]
+noli = { git = "https://github.com/hikalium/wasabi.git", optional = true }
