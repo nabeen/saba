@@ -55,7 +55,7 @@ dependencies = [
 [[package]]
 name = "font"
 version = "0.1.0"
-source = "git+https://github.com/hikalium/wasabi.git#abf27c6f587e777fce5c53234d45d997ed075996"
+source = "git+https://github.com/hikalium/wasabi.git?branch=for_saba#abf27c6f587e777fce5c53234d45d997ed075996"
 dependencies = [
  "syn",
 ]
@@ -69,7 +69,7 @@ checksum = "c3c8dda44ff03a2f238717214da50f65d5a53b45cd213a7370424ffdb6fae815"
 [[package]]
 name = "noli"
 version = "0.1.0"
-source = "git+https://github.com/hikalium/wasabi.git#abf27c6f587e777fce5c53234d45d997ed075996"
+source = "git+https://github.com/hikalium/wasabi.git?branch=for_saba#abf27c6f587e777fce5c53234d45d997ed075996"
 dependencies = [
  "embedded-graphics",
  "font",
@@ -113,7 +113,7 @@ dependencies = [
 [[package]]
 name = "sabi"
 version = "0.1.0"
-source = "git+https://github.com/hikalium/wasabi.git#abf27c6f587e777fce5c53234d45d997ed075996"
+source = "git+https://github.com/hikalium/wasabi.git?branch=for_saba#abf27c6f587e777fce5c53234d45d997ed075996"
 
 [[package]]
 name = "syn"
