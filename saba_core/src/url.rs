@@ -17,7 +17,7 @@ impl Url {
             host: "".to_string(),
             port: "".to_string(),
             path: "".to_string(),
-            searchpart: "".to_string()
+            searchpart: "".to_string(),
         }
     }
 
@@ -93,7 +93,7 @@ impl Url {
             .collect();
 
         if url_parts.len() < 2 {
-            return "".to_string()
+            return "".to_string();
         }
 
         let path_and_searchpart: Vec<&str> = url_parts[1].splitn(2, "?").collect();
@@ -108,7 +108,7 @@ impl Url {
             .collect();
 
         if url_parts.len() < 2 {
-            return "".to_string()
+            return "".to_string();
         }
 
         let path_and_searchpart: Vec<&str> = url_parts[1].splitn(2, "?").collect();
@@ -132,7 +132,7 @@ mod tests {
             host: "example.com".to_string(),
             port: "80".to_string(),
             path: "".to_string(),
-            searchpart: "".to_string()
+            searchpart: "".to_string(),
         });
         assert_eq!(expected, Url::new(url).parse());
     }
@@ -145,7 +145,7 @@ mod tests {
             host: "example.com".to_string(),
             port: "8888".to_string(),
             path: "".to_string(),
-            searchpart: "".to_string()
+            searchpart: "".to_string(),
         });
         assert_eq!(expected, Url::new(url).parse());
     }
@@ -158,7 +158,7 @@ mod tests {
             host: "example.com".to_string(),
             port: "8888".to_string(),
             path: "index.html".to_string(),
-            searchpart: "".to_string()
+            searchpart: "".to_string(),
         });
         assert_eq!(expected, Url::new(url).parse());
     }
@@ -171,7 +171,7 @@ mod tests {
             host: "example.com".to_string(),
             port: "80".to_string(),
             path: "index.html".to_string(),
-            searchpart: "".to_string()
+            searchpart: "".to_string(),
         });
         assert_eq!(expected, Url::new(url).parse());
     }
@@ -184,18 +184,18 @@ mod tests {
             host: "example.com".to_string(),
             port: "8888".to_string(),
             path: "index.html".to_string(),
-            searchpart: "a=123&b=456".to_string()
+            searchpart: "a=123&b=456".to_string(),
         });
         assert_eq!(expected, Url::new(url).parse());
     }
-    
+
     #[test]
     fn test_no_scheme() {
         let url = "example.com".to_string();
         let expected = Err("Only HTTP scheme is supported.".to_string());
         assert_eq!(expected, Url::new(url).parse());
     }
-    
+
     #[test]
     fn test_unsupported_scheme() {
         let url = "https://example.com:8888/index.html".to_string();
