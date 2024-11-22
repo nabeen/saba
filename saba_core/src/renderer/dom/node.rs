@@ -5,7 +5,33 @@ use alloc::rc::Weak;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cell::RefCell;
+use core::fmt::Display;
+use core::fmt::Formatter;
 use core::str::FromStr;
+
+#[derive(Debug, Clone)]
+pub struct Window {
+    document: Rc<RefCell<Node>>,
+}
+
+impl Window {
+    pub fn new() -> Self {
+        let window = Self {
+            document: Rc::new(RefCell::new(Node::new(NodeKind::Document))),
+        };
+
+        window
+            .document
+            .borrow_mut()
+            .set_window(Rc::downgrade(&Rc::new(RefCell::new(window.clone()))));
+
+        window
+    }
+
+    pub fn document(&self) -> Rc<RefCell<Node>> {
+        self.document.clone()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Node {
@@ -35,6 +61,10 @@ impl Node {
             previous_sibling: Weak::new(),
             next_sibling: None,
         }
+    }
+
+    pub fn set_window(&mut self, window: Weak<RefCell<Window>>) {
+        self.window = window;
     }
 
     pub fn set_parent(&mut self, parent: Weak<RefCell<Node>>) {
@@ -77,10 +107,6 @@ impl Node {
         self.next_sibling.as_ref().cloned()
     }
 
-    pub fn set_window(&mut self, window: Weak<RefCell<Window>>) {
-        self.window = window;
-    }
-
     pub fn kind(&self) -> NodeKind {
         self.kind.clone()
     }
@@ -100,7 +126,7 @@ impl Node {
     }
 }
 
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone)]
 pub enum NodeKind {
     Document,
     Element(Element),
@@ -117,30 +143,6 @@ impl PartialEq for NodeKind {
             },
             NodeKind::Text(_) => matches!(other, NodeKind::Text(_)),
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Window {
-    document: Rc<RefCell<Node>>,
-}
-
-impl Window {
-    pub fn new() -> Self {
-        let window = Self {
-            document: Rc::new(RefCell::new(Node::new(NodeKind::Document))),
-        };
-
-        window
-            .document
-            .borrow_mut()
-            .set_window(Rc::downgrade(&Rc::new(RefCell::new(window.clone()))));
-
-        window
-    }
-
-    pub fn document(&self) -> Rc<RefCell<Node>> {
-        self.document.clone()
     }
 }
 
@@ -162,6 +164,17 @@ impl Element {
     pub fn kind(&self) -> ElementKind {
         self.kind
     }
+
+    pub fn attributes(&self) -> Vec<Attribute> {
+        self.attributes.clone()
+    }
+
+    pub fn is_block_element(&self) -> bool {
+        match self.kind {
+            ElementKind::Body | ElementKind::H1 | ElementKind::H2 | ElementKind::P => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -175,6 +188,23 @@ pub enum ElementKind {
     H1,
     H2,
     A,
+}
+
+impl Display for ElementKind {
+    fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
+        let s = match self {
+            ElementKind::Html => "html",
+            ElementKind::Head => "head",
+            ElementKind::Style => "style",
+            ElementKind::Script => "script",
+            ElementKind::Body => "body",
+            ElementKind::H1 => "h1",
+            ElementKind::H2 => "h2",
+            ElementKind::P => "p",
+            ElementKind::A => "a",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 impl FromStr for ElementKind {
