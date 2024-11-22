@@ -1,5 +1,6 @@
 use crate::alloc::string::ToString;
-use crate::renderer::css::token::{CssToken, CssTokenizer};
+use crate::renderer::css::token::CssToken;
+use crate::renderer::css::token::CssTokenizer;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::iter::Peekable;
@@ -14,52 +15,71 @@ impl CssParser {
         Self { t: t.peekable() }
     }
 
-    pub fn parse_stylesheet(&mut self) -> StyleSheet {
-        let mut sheet = StyleSheet::new();
-        sheet.set_rules(self.consume_list_of_rules());
-        sheet
+    fn consume_component_value(&mut self) -> ComponentValue {
+        self.t
+            .next()
+            .expect("should have a token in consume_component_value")
     }
 
-    fn consume_list_of_rules(&mut self) -> Vec<QualifiedRule> {
-        let mut rules = Vec::new();
+    fn consume_ident(&mut self) -> String {
+        let token = match self.t.next() {
+            Some(t) => t,
+            None => panic!("should have a token but got None"),
+        };
 
-        loop {
-            let token = match self.t.peek() {
-                Some(t) => t,
-                None => return rules,
-            };
-            match token {
-                CssToken::AtKeyword(_keyword) => {
-                    let _rule = self.consume_qualified_rule();
-                }
-                _ => {
-                    let rule = self.consume_qualified_rule();
-                    match rule {
-                        Some(r) => rules.push(r),
-                        None => return rules,
-                    }
-                }
+        match token {
+            CssToken::Ident(ref ident) => ident.to_string(),
+            _ => {
+                panic!("Parse error: {:?} is an unexpected token.", token);
             }
         }
     }
 
-    fn consume_qualified_rule(&mut self) -> Option<QualifiedRule> {
-        let mut rule = QualifiedRule::new();
+    fn consume_declaration(&mut self) -> Option<Declaration> {
+        if self.t.peek().is_none() {
+            return None;
+        }
+
+        let mut declaration = Declaration::new();
+        declaration.set_property(self.consume_ident());
+
+        match self.t.next() {
+            Some(token) => match token {
+                CssToken::Colon => {}
+                _ => return None,
+            },
+            None => return None,
+        }
+
+        declaration.set_value(self.consume_component_value());
+
+        Some(declaration)
+    }
+
+    fn consume_list_of_declarations(&mut self) -> Vec<Declaration> {
+        let mut declarations = Vec::new();
 
         loop {
             let token = match self.t.peek() {
                 Some(t) => t,
-                None => return None,
+                None => return declarations,
             };
 
             match token {
-                CssToken::OpenCurly => {
-                    assert_eq!(self.t.next(), Some(CssToken::OpenCurly));
-                    rule.set_declarations(self.consume_list_of_declarations());
-                    return Some(rule);
+                CssToken::CloseCurly => {
+                    assert_eq!(self.t.next(), Some(CssToken::CloseCurly));
+                    return declarations;
+                }
+                CssToken::SemiColon => {
+                    assert_eq!(self.t.next(), Some(CssToken::SemiColon));
+                }
+                CssToken::Ident(ref _ident) => {
+                    if let Some(declaration) = self.consume_declaration() {
+                        declarations.push(declaration);
+                    }
                 }
                 _ => {
-                    rule.set_selector(self.consume_selector());
+                    self.t.next();
                 }
             }
         }
@@ -100,74 +120,56 @@ impl CssParser {
         }
     }
 
-    fn consume_list_of_declarations(&mut self) -> Vec<Declaration> {
-        let mut declarations = Vec::new();
+    fn consume_qualified_rule(&mut self) -> Option<QualifiedRule> {
+        let mut rule = QualifiedRule::new();
 
         loop {
             let token = match self.t.peek() {
                 Some(t) => t,
-                None => return declarations,
+                None => return None,
             };
 
             match token {
-                CssToken::CloseCurly => {
-                    assert_eq!(self.t.next(), Some(CssToken::CloseCurly));
-                    return declarations;
-                }
-                CssToken::SemiColon => {
-                    assert_eq!(self.t.next(), Some(CssToken::SemiColon));
-                }
-                CssToken::Ident(ref _ident) => {
-                    if let Some(declaration) = self.consume_declaration() {
-                        declarations.push(declaration)
-                    }
+                CssToken::OpenCurly => {
+                    assert_eq!(self.t.next(), Some(CssToken::OpenCurly));
+                    rule.set_declarations(self.consume_list_of_declarations());
+                    return Some(rule);
                 }
                 _ => {
-                    self.t.next();
+                    rule.set_selector(self.consume_selector());
                 }
             }
         }
     }
 
-    fn consume_declaration(&mut self) -> Option<Declaration> {
-        if self.t.peek().is_none() {
-            return None;
-        }
+    fn consume_list_of_rules(&mut self) -> Vec<QualifiedRule> {
+        let mut rules = Vec::new();
 
-        let mut declaration = Declaration::new();
-        declaration.set_property(self.consume_ident());
-
-        match self.t.next() {
-            Some(token) => match token {
-                CssToken::Colon => {}
-                _ => return None,
-            },
-            None => return None,
-        }
-
-        declaration.set_value(self.consume_component_value());
-
-        Some(declaration)
-    }
-
-    fn consume_ident(&mut self) -> String {
-        let token = match self.t.next() {
-            Some(t) => t,
-            None => panic!("should have a token but got None"),
-        };
-
-        match token {
-            CssToken::Ident(ref ident) => ident.to_string(),
-            _ => {
-                panic!("Parse error: {:?} is an unexpected token.", token);
+        loop {
+            let token = match self.t.peek() {
+                Some(t) => t,
+                None => return rules,
+            };
+            match token {
+                CssToken::AtKeyword(_keyword) => {
+                    let _rule = self.consume_qualified_rule();
+                }
+                _ => {
+                    let rule = self.consume_qualified_rule();
+                    match rule {
+                        Some(r) => rules.push(r),
+                        None => return rules,
+                    }
+                }
             }
         }
     }
 
-    fn consume_component_value(&mut self) -> ComponentValue {
-        self.t
-            .next()
-            .expect("should have a token in consume_component_value")
+    pub fn parse_stylesheet(&mut self) -> StyleSheet {
+        let mut sheet = StyleSheet::new();
+
+        sheet.set_rules(self.consume_list_of_rules());
+        sheet
     }
 }
 
