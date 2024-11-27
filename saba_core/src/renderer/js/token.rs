@@ -152,7 +152,6 @@ impl Iterator for JsLexer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::borrow::ToOwned;
     use alloc::string::ToString;
 
     #[test]

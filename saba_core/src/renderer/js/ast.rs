@@ -1,5 +1,6 @@
 use crate::renderer::js::token::{JsLexer, Token};
 use alloc::rc::Rc;
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::iter::Peekable;
 
@@ -21,6 +22,15 @@ pub enum Node {
         property: Option<Rc<Node>>,
     },
     NumericLiteral(u64),
+    VariableDeclaration {
+        declarations: Vec<Option<Rc<Node>>>,
+    },
+    VariableDeclarator {
+        id: Option<Rc<Node>>,
+        init: Option<Rc<Node>>,
+    },
+    Identifier(String),
+    StringLiteral(String),
 }
 
 impl Node {
@@ -62,6 +72,25 @@ impl Node {
     pub fn new_numeric_literal(value: u64) -> Option<Rc<Self>> {
         Some(Rc::new(Node::NumericLiteral(value)))
     }
+
+    pub fn new_variable_declarator(
+        id: Option<Rc<Node>>,
+        init: Option<Rc<Node>>,
+    ) -> Option<Rc<Self>> {
+        Some(Rc::new(Node::VariableDeclarator { id, init }))
+    }
+
+    pub fn new_variable_declaration(declarations: Vec<Option<Rc<Self>>>) -> Option<Rc<Self>> {
+        Some(Rc::new(Node::VariableDeclaration { declarations }))
+    }
+
+    pub fn new_identifier(name: String) -> Option<Rc<Self>> {
+        Some(Rc::new(Node::Identifier(name)))
+    }
+
+    pub fn new_string_literal(value: String) -> Option<Rc<Self>> {
+        Some(Rc::new(Node::StringLiteral(value)))
+    }
 }
 
 pub struct JsParser {
@@ -101,7 +130,23 @@ impl JsParser {
     }
 
     fn statement(&mut self) -> Option<Rc<Node>> {
-        let node = Node::new_expression_statement(self.assignment_expression());
+        let t = match self.t.peek() {
+            Some(t) => t,
+            None => return None,
+        };
+
+        let node = match t {
+            Token::Keyword(keyword) => {
+                if keyword == "var" {
+                    assert!(self.t.next().is_some());
+
+                    self.variable_declaration()
+                } else {
+                    None
+                }
+            }
+            _ => Node::new_expression_statement(self.assignment_expression()),
+        };
 
         if let Some(Token::Punctuator(c)) = self.t.peek() {
             if c == &';' {
@@ -112,8 +157,59 @@ impl JsParser {
         node
     }
 
+    fn variable_declaration(&mut self) -> Option<Rc<Node>> {
+        let ident = self.identifier();
+
+        let declarator = Node::new_variable_declarator(ident, self.initializer());
+
+        let mut declarations = Vec::new();
+        declarations.push(declarator);
+
+        Node::new_variable_declaration(declarations)
+    }
+
+    fn identifier(&mut self) -> Option<Rc<Node>> {
+        let t = match self.t.next() {
+            Some(token) => token,
+            None => return None,
+        };
+
+        match t {
+            Token::Identifier(name) => Node::new_identifier(name),
+            _ => None,
+        }
+    }
+
+    fn initializer(&mut self) -> Option<Rc<Node>> {
+        let t = match self.t.next() {
+            Some(token) => token,
+            None => return None,
+        };
+
+        match t {
+            Token::Punctuator(c) => match c {
+                '=' => self.assignment_expression(),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     fn assignment_expression(&mut self) -> Option<Rc<Node>> {
-        self.additive_expression()
+        let expr = self.additive_expression();
+
+        let t = match self.t.peek() {
+            Some(token) => token,
+            None => return expr,
+        };
+
+        match t {
+            Token::Punctuator('=') => {
+                assert!(self.t.next().is_some());
+                Node::new_assignment_expression('=', expr, self.assignment_expression())
+            }
+            _ => expr,
+        }
     }
 
     fn additive_expression(&mut self) -> Option<Rc<Node>> {
@@ -151,6 +247,8 @@ impl JsParser {
         };
 
         match t {
+            Token::Identifier(value) => Node::new_identifier(value),
+            Token::StringLiteral(value) => Node::new_string_literal(value),
             Token::Number(value) => Node::new_numeric_literal(value),
             _ => None,
         }
@@ -220,5 +318,52 @@ mod tests {
         )))));
         expected.set_body(body);
         assert_eq!(expected, parser.parse_ast())
+    }
+
+    #[test]
+    fn test_assign_variable() {
+        let input = "var foo=\"bar\";".to_string();
+        let lexer = JsLexer::new(input);
+        let mut parser = JsParser::new(lexer);
+        let mut expected = Program::new();
+        let mut body = Vec::new();
+        body.push(Rc::new(Node::VariableDeclaration {
+            declarations: [Some(Rc::new(Node::VariableDeclarator {
+                id: Some(Rc::new(Node::Identifier("foo".to_string()))),
+                init: Some(Rc::new(Node::StringLiteral("bar".to_string()))),
+            }))]
+            .to_vec(),
+        }));
+        expected.set_body(body);
+        assert_eq!(expected, parser.parse_ast());
+    }
+
+    #[test]
+    fn test_add_variable_and_num() {
+        let input = "var foo=42; var result=foo+1;".to_string();
+        let lexer = JsLexer::new(input);
+        let mut parser = JsParser::new(lexer);
+        let mut expected = Program::new();
+        let mut body = Vec::new();
+        body.push(Rc::new(Node::VariableDeclaration {
+            declarations: [Some(Rc::new(Node::VariableDeclarator {
+                id: Some(Rc::new(Node::Identifier("foo".to_string()))),
+                init: Some(Rc::new(Node::NumericLiteral(42))),
+            }))]
+            .to_vec(),
+        }));
+        body.push(Rc::new(Node::VariableDeclaration {
+            declarations: [Some(Rc::new(Node::VariableDeclarator {
+                id: Some(Rc::new(Node::Identifier("result".to_string()))),
+                init: Some(Rc::new(Node::AdditiveExpression {
+                    operator: '+',
+                    left: Some(Rc::new(Node::Identifier("foo".to_string()))),
+                    right: Some(Rc::new(Node::NumericLiteral(1))),
+                })),
+            }))]
+            .to_vec(),
+        }));
+        expected.set_body(body);
+        assert_eq!(expected, parser.parse_ast());
     }
 }
